@@ -23,18 +23,31 @@ le front et l'API partagent la même origine, sans CORS.
 
 ## Déploiement
 
-À chaque push sur `main`, `.github/workflows/ci-cd.yml` :
+`.github/workflows/ci-cd.yml` :
 
-1. construit l'image et la publie sur `ghcr.io/augustinde/front-demo` (tags `sha-<commit>` et `latest`) ;
-2. la déploie sur le cluster k3s-test (namespace `demo`) avec Helm, en s'authentifiant par OIDC GitHub
-   derrière Cloudflare Access. Aucun jeton Kubernetes n'est stocké chez GitHub.
+| Événement | Ce qui se passe |
+| --- | --- |
+| pull request (dont Renovate) | build de contrôle, rien n'est publié |
+| push sur `main` | image `ghcr.io/augustinde/front-demo:sha-<commit>`, déployée en **test** : `https://front-demo-test.augustinde.dev` (namespace `demo`) |
+| tag `v1.2.3` | la même image, réétiquetée `v1.2.3`, déployée en **prod** : `https://front-demo.augustinde.dev` (namespace `demo-prod`) |
 
+Mettre en production le commit actuellement en test :
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+Le tag doit porter sur un commit déjà construit sur `main`, sinon le job `release` s'arrête.
+Authentification par OIDC GitHub derrière Cloudflare Access : aucun jeton Kubernetes n'est stocké chez GitHub.
 Le déploiement est ignoré tant que la variable `K8S_API_HOST` n'est pas définie.
-Configuration côté GitHub : voir l'étape 0 de la procédure k3s.
+Configuration côté GitHub : étapes 0, 10 et 11 de la procédure k3s.
+Les dépendances sont suivies par Renovate (`renovate.json`) : correctifs fusionnés automatiquement, le reste à valider.
 
 | Fichier | Rôle |
 | --- | --- |
 | `deploy/chart/` | chart Helm générique (copie de `k3s-lab/helmfile/charts/app`) |
 | `deploy/values-test.yaml` | valeurs de l'environnement de test |
+| `deploy/values-prod.yaml` | valeurs de la production |
+| `.github/workflows/deploy.yml` | déploiement Helm commun à test et prod |
 | `deploy/write-kubeconfig.sh` | kubeconfig sans secret pour le job |
 | `deploy/github-oidc-credential.sh` | fournit le jeton OIDC GitHub à kubectl/helm |
