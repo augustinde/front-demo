@@ -1,0 +1,39 @@
+# Valeurs du chart deploy/chart pour l'environnement de test (cluster k3s-test, namespace demo).
+# image.tag et ingress.host sont fournis par le workflow GitHub (--set).
+image:
+  repository: ghcr.io/augustinde/front-demo
+  tag: ""
+
+# Paquet GHCR privé ? Créer le secret ghcr-pull (tenants.demo.registry dans k3s-lab) et décommenter.
+# imagePullSecrets:
+#   - name: ghcr-pull
+
+containerPort: 8080
+
+env:
+  # nginx relaie /api vers ce service (nom DNS complet : le résolveur nginx n'utilise pas les domaines de recherche)
+  API_UPSTREAM: http://api-demo.demo.svc.cluster.local
+
+probes:
+  liveness:
+    path: /healthz
+  readiness:
+    path: /healthz
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+  limits:
+    memory: 64Mi
+
+# Image nginx-unprivileged : utilisateur nginx (uid 101)
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  seccompProfile:
+    type: RuntimeDefault
+
+ingress:
+  host: ""

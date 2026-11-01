@@ -1,0 +1,38 @@
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Résolution à la demande : nginx démarre même si l'API n'est pas encore déployée.
+    resolver ${NGINX_LOCAL_RESOLVERS} valid=30s ipv6=off;
+
+    # Même origine que le front : pas de CORS. L'URI d'origine (/api/...) est transmise telle quelle.
+    location /api/ {
+        set $api_upstream ${API_UPSTREAM};
+        proxy_pass $api_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # Sonde Kubernetes
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok";
+    }
+
+    # Fichiers avec empreinte dans le nom : cache long
+    location ~* \.(js|css|ico|png|svg|woff2?)$ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # Application monopage : toute autre route renvoie index.html
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+}
